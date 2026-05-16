@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+:root {
+  --background: #080808;
+  --surface-1: #111111;
+  --surface-2: #1a1a1a;
+  --accent-gold: #c9a84c;
+  --accent-cyan: #00d4ff;
+  --text-primary: #f0f0f0;
+  --text-muted: #888888;
+  --border: rgba(255, 255, 255, 0.07);
+  --font-display: var(--font-space-grotesk), "Space Grotesk", sans-serif;
+  --font-body: var(--font-inter), "Inter", sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-space-grotesk);
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-gold);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #e0bb63;
+}
+
+/* Text selection */
+::selection {
+  background: rgba(201, 168, 76, 0.3);
+  color: var(--text-primary);
+}
+
+/* Marquee animation */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Floating particles */
+@keyframes float-particle {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) translateX(30px);
+    opacity: 0;
+  }
+}
+
+.particle {
+  animation: float-particle linear infinite;
+}
+
+/* Counter animation */
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Timeline line animation */
+@keyframes draw-line {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.draw-line {
+  animation: draw-line 1.2s ease-out forwards;
+}
+
+/* Scroll indicator bounce */
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0) translateX(-50%);
+  }
+  50% {
+    transform: translateY(8px) translateX(-50%);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 2s ease-in-out infinite;
+}
+
+/* Glow pulse */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(201, 168, 76, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(201, 168, 76, 0.6);
+  }
+}
+
+.glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Badge float */
+@keyframes badge-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.badge-float {
+  animation: badge-float 4s ease-in-out infinite;
+}

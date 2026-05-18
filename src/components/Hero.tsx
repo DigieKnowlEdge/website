@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ChevronDown, Sparkles, Play } from "lucide-react";
+import { useRegistration } from "@/context/RegistrationContext";
 
 // CSS-only floating particles configuration
 const PARTICLES = Array.from({ length: 25 }, (_, i) => ({
@@ -26,6 +27,7 @@ export default function Hero() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  const { openModal } = useRegistration();
   const { scrollY } = useScroll();
   // Disable parallax on mobile to avoid iOS jank
   const bgY = useTransform(scrollY, [0, 800], isMobile ? [0, 0] : [0, 120]);
@@ -169,11 +171,11 @@ export default function Hero() {
           className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
         >
           <button
-            onClick={() => handleScroll("#programs")}
+            onClick={openModal}
             className="group relative px-8 py-4 bg-[#C9A84C] text-[#080808] font-bold rounded-full text-base transition-all duration-300 hover:bg-[#e0bb63] hover:shadow-[0_0_40px_rgba(201,168,76,0.4)] glow-pulse min-h-[44px] cursor-pointer w-full sm:w-auto"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
           >
-            Explore Programs
+            Enroll Now
           </button>
           <button
             onClick={() => handleScroll("#how-it-works")}

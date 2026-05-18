@@ -13,6 +13,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { ScrollReveal, StaggerContainer, staggerChild } from "./ScrollReveal";
+import { useRegistration } from "@/context/RegistrationContext";
 
 const programs = [
   {
@@ -68,9 +69,10 @@ const programs = [
 interface ProgramCardProps {
   program: (typeof programs)[0];
   index: number;
+  onEnroll: (title: string) => void;
 }
 
-function ProgramCard({ program, index }: ProgramCardProps) {
+function ProgramCard({ program, index, onEnroll }: ProgramCardProps) {
   const Icon = program.icon;
   const isGold = program.accentColor === "#C9A84C";
 
@@ -170,6 +172,7 @@ function ProgramCard({ program, index }: ProgramCardProps) {
 
       {/* CTA */}
       <button
+        onClick={() => onEnroll(program.title)}
         className="flex items-center gap-2 text-sm font-semibold transition-colors duration-300 group/cta -mt-1 cursor-pointer"
         style={{
           color: "#888888",
@@ -182,7 +185,7 @@ function ProgramCard({ program, index }: ProgramCardProps) {
           (e.currentTarget as HTMLButtonElement).style.color = "#888888";
         }}
       >
-        Learn More
+        Enroll Now
         <ArrowRight size={14} className="transition-transform duration-300 group-hover/cta:translate-x-1" />
       </button>
     </motion.div>
@@ -190,6 +193,14 @@ function ProgramCard({ program, index }: ProgramCardProps) {
 }
 
 export default function Programs() {
+  const { openModal } = useRegistration();
+
+  const handleEnroll = (title: string) => {
+    // Pre-fill course in modal via sessionStorage so RegistrationModal can pick it up
+    sessionStorage.setItem("prefillCourse", title);
+    openModal();
+  };
+
   return (
     <section id="programs" className="py-24 lg:py-32 px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -221,7 +232,7 @@ export default function Programs() {
         {/* Cards Grid — desktop 2x2, mobile horizontal scroll */}
         <StaggerContainer staggerDelay={0.12} className="hidden sm:grid sm:grid-cols-2 gap-6">
           {programs.map((program, i) => (
-            <ProgramCard key={program.id} program={program} index={i} />
+            <ProgramCard key={program.id} program={program} index={i} onEnroll={handleEnroll} />
           ))}
         </StaggerContainer>
 
@@ -268,6 +279,13 @@ export default function Programs() {
                       <span>{program.duration}</span>
                     </div>
                   </div>
+                  <button
+                    onClick={() => handleEnroll(program.title)}
+                    className="flex items-center gap-2 text-sm font-semibold cursor-pointer"
+                    style={{ color: program.accentColor, fontFamily: "var(--font-space-grotesk)" }}
+                  >
+                    Enroll Now <ArrowRight size={14} />
+                  </button>
                 </div>
               </div>
             ))}

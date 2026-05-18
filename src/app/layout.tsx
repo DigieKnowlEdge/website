@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
 import "./globals.css";
+import { RegistrationProvider } from "@/context/RegistrationContext";
+import RegistrationModal from "@/components/RegistrationModal";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -42,7 +44,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="bg-[#080808] text-[#F0F0F0] antialiased overflow-x-hidden">
-        {children}
+        <RegistrationProvider>
+          {children}
+          <RegistrationModal />
+        </RegistrationProvider>
       </body>
     </html>
   );

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
+import { useRegistration } from "@/context/RegistrationContext";
 
 const navLinks = [
   { label: "Programs", href: "#programs" },
@@ -15,6 +16,7 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { openModal } = useRegistration();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 80);
@@ -81,7 +83,7 @@ export default function Navbar() {
             {/* Desktop CTA */}
             <div className="hidden md:flex items-center gap-4">
               <button
-                onClick={() => handleNavClick("#programs")}
+                onClick={() => { setMenuOpen(false); openModal(); }}
                 className="px-5 py-2.5 text-sm font-semibold text-[#C9A84C] border border-[#C9A84C] rounded-full hover:bg-[#C9A84C] hover:text-[#080808] transition-all duration-300 cursor-pointer tracking-wide"
                 style={{ fontFamily: "var(--font-space-grotesk)" }}
               >
@@ -149,7 +151,7 @@ export default function Navbar() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -30 }}
                 transition={{ duration: 0.4, delay: navLinks.length * 0.08 }}
-                onClick={() => handleNavClick("#programs")}
+                onClick={() => { setMenuOpen(false); openModal(); }}
                 className="mt-8 w-full py-4 text-xl font-semibold bg-[#C9A84C] text-[#080808] rounded-full hover:bg-[#e0bb63] transition-colors duration-300 cursor-pointer"
                 style={{ fontFamily: "var(--font-space-grotesk)" }}
               >

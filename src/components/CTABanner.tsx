@@ -3,12 +3,10 @@
 import { motion } from "framer-motion";
 import { ArrowRight, Zap } from "lucide-react";
 import { ScrollReveal } from "./ScrollReveal";
+import { useRegistration } from "@/context/RegistrationContext";
 
 export default function CTABanner() {
-  const handleEnroll = () => {
-    const el = document.querySelector("#programs");
-    if (el) el.scrollIntoView({ behavior: "smooth" });
-  };
+  const { openModal } = useRegistration();
 
   return (
     <section className="relative py-24 px-6 lg:px-8 overflow-hidden">
@@ -91,7 +89,7 @@ export default function CTABanner() {
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <motion.button
-              onClick={handleEnroll}
+              onClick={openModal}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-[#C9A84C] text-[#080808] font-bold rounded-full text-base transition-all duration-300 hover:bg-[#e0bb63] hover:shadow-[0_0_50px_rgba(201,168,76,0.4)] min-h-[44px] cursor-pointer"
@@ -103,6 +101,7 @@ export default function CTABanner() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
+              onClick={openModal}
               className="inline-flex items-center justify-center gap-2 px-8 py-4 border border-white/15 text-[#F0F0F0] font-semibold rounded-full text-base hover:border-white/30 hover:bg-white/5 transition-all duration-300 min-h-[44px] cursor-pointer"
               style={{ fontFamily: "var(--font-space-grotesk)" }}
             >

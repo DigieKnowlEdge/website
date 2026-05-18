@@ -142,11 +142,11 @@ export default function Footer() {
               <li className="flex items-start gap-2.5">
                 <Mail size={14} className="text-[#C9A84C] mt-0.5 flex-shrink-0" />
                 <a
-                  href="mailto:hello@digieknowledge.com"
+                  href="mailto:information@digieknowledge.com"
                   className="text-sm text-[#888888] hover:text-[#F0F0F0] transition-colors duration-300"
                   style={{ fontFamily: "var(--font-inter)" }}
                 >
-                  hello@digieknowledge.com
+                  information@digieknowledge.com
                 </a>
               </li>
               <li className="flex items-start gap-2.5">

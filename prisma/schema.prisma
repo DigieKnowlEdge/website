@@ -1,0 +1,643 @@
+// DigieKnowledge LMS — Prisma schema (design artifact, Phase 1)
+// Naming: PascalCase models / camelCase fields in Prisma Client, snake_case tables/columns in Postgres.
+// See docs/lms/03-database-design.md for ERD, rationale, and migration strategy.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+  PENDING_INVITE
+}
+
+enum ContentType {
+  VIDEO
+  PDF
+  DOCUMENT
+  PRESENTATION
+  LINK
+  RESOURCE
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum BatchStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  SUSPENDED
+  COMPLETED
+  TRANSFERRED
+  CANCELLED
+}
+
+enum FeeStatus {
+  PAID
+  PENDING
+  OVERDUE
+  WAIVED
+}
+
+enum SubmissionType {
+  FILE
+  ZIP
+  GITHUB_LINK
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  GRADED
+  RESUBMISSION_REQUESTED
+}
+
+enum NotificationTargetType {
+  ALL
+  COURSE
+  BATCH
+  INDIVIDUAL
+}
+
+enum TestimonialStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TranscodeStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum StudentCategory {
+  STUDENT
+  FRESHER
+  PROFESSIONAL
+}
+
+// ---------------------------------------------------------------------------
+// Identity, RBAC
+// ---------------------------------------------------------------------------
+
+// Reserved for future corporate-training multi-tenancy; nullable everywhere until used.
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  domain    String?  @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users User[]
+
+  @@map("organizations")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // SUPER_ADMIN | ADMIN | MENTOR | STUDENT | future custom roles
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system") // system roles can't be deleted from Admin UI
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  permissions RolePermission[]
+  users       User[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  key         String  @unique // "resource:action" e.g. "course:create"
+  description String?
+
+  roles           RolePermission[]
+  userPermissions UserPermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// Per-user grant/revoke overrides on top of the role's default permission set.
+model UserPermission {
+  userId       String  @map("user_id")
+  permissionId String  @map("permission_id")
+  granted      Boolean // true = explicit grant, false = explicit revoke
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@map("user_permissions")
+}
+
+model User {
+  id             String     @id @default(uuid())
+  keycloakId     String     @unique @map("keycloak_id")
+  email          String     @unique
+  fullName       String     @map("full_name")
+  phone          String?
+  avatarUrl      String?    @map("avatar_url")
+  status         UserStatus @default(PENDING_INVITE)
+  roleId         String     @map("role_id")
+  organizationId String?    @map("organization_id")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  deletedAt      DateTime?  @map("deleted_at") // soft delete: preserves FK history for audit
+
+  role         Role          @relation(fields: [roleId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+
+  userPermissions UserPermission[]
+  studentProfile  StudentProfile?
+  mentorProfile   MentorProfile?
+
+  loginLogs          LoginLog[]
+  deviceFingerprints DeviceFingerprint[]
+  sessions           Session[]
+
+  auditLogsAsActor  AuditLog[] @relation("AuditActor")
+  auditLogsAsTarget AuditLog[] @relation("AuditTarget")
+
+  notificationsCreated   Notification[]
+  notificationRecipients NotificationRecipient[]
+  testimonialsReviewed   Testimonial[]            @relation("TestimonialReviewer")
+  contentCreated         Content[]                @relation("ContentCreator")
+  coursesCreated         Course[]                 @relation("CourseCreator")
+
+  @@index([roleId])
+  @@index([organizationId])
+  @@map("users")
+}
+
+model StudentProfile {
+  id                   String          @id @default(uuid())
+  userId               String          @unique @map("user_id")
+  category             StudentCategory @default(STUDENT)
+  currentOrganization  String?         @map("current_organization") // employer, distinct from tenant Organization
+  learningGoals        String?         @map("learning_goals")
+  upskillingObjectives String?         @map("upskilling_objectives")
+  feeReminderOptIn     Boolean         @default(true) @map("fee_reminder_opt_in")
+  createdAt            DateTime        @default(now()) @map("created_at")
+
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+  progress    StudentProgress[]
+  submissions AssignmentSubmission[]
+  testimonials Testimonial[]
+
+  @@map("student_profiles")
+}
+
+model MentorProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique @map("user_id")
+  bio               String?
+  expertise         String[]
+  linkedinUrl       String?  @map("linkedin_url")
+  yearsOfExperience Int?     @map("years_of_experience")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batchAssignments BatchMentor[]
+  gradedSubmissions AssignmentSubmission[] @relation("SubmissionGrader")
+  testimonialsAbout Testimonial[]          @relation("TestimonialMentor")
+
+  @@map("mentor_profiles")
+}
+
+// ---------------------------------------------------------------------------
+// Catalog: Category, Tag, Course, Module, Content
+// ---------------------------------------------------------------------------
+
+model Category {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  slug        String  @unique
+  description String?
+
+  courses Course[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id   String @id @default(uuid())
+  name String @unique
+  slug String @unique
+
+  courses CourseTag[]
+
+  @@map("tags")
+}
+
+model Course {
+  id           String       @id @default(uuid())
+  categoryId   String       @map("category_id")
+  title        String
+  slug         String       @unique
+  description  String?
+  level        String? // "Beginner" | "Intermediate" | "Advanced" — free text, admin-defined
+  thumbnailUrl String?      @map("thumbnail_url")
+  status       CourseStatus @default(DRAFT)
+  createdById  String       @map("created_by_id")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  archivedAt   DateTime?    @map("archived_at")
+
+  category  Category    @relation(fields: [categoryId], references: [id])
+  createdBy User        @relation("CourseCreator", fields: [createdById], references: [id])
+  tags      CourseTag[]
+  modules   Module[]
+  batches   Batch[]
+  testimonials Testimonial[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("courses")
+}
+
+model CourseTag {
+  courseId String @map("course_id")
+  tagId    String @map("tag_id")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, tagId])
+  @@map("course_tags")
+}
+
+model Module {
+  id          String   @id @default(uuid())
+  courseId    String   @map("course_id")
+  title       String
+  description String?
+  order       Int
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  contents    Content[]
+  assignments Assignment[]
+
+  @@index([courseId])
+  @@map("modules")
+}
+
+// Unifies Video/PDF/Document/Presentation/Resource/Link under one polymorphic
+// content record (see docs/lms/03-database-design.md, "why one Content table").
+model Content {
+  id          String        @id @default(uuid())
+  moduleId    String        @map("module_id")
+  type        ContentType
+  title       String
+  description String?
+  order       Int
+  status      ContentStatus @default(DRAFT)
+  fileKey     String?       @map("file_key") // S3 key for PDF/DOCUMENT/PRESENTATION/RESOURCE
+  externalUrl String?       @map("external_url") // for type = LINK
+  createdById String        @map("created_by_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  archivedAt  DateTime?     @map("archived_at")
+
+  module    Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  createdBy User       @relation("ContentCreator", fields: [createdById], references: [id])
+  video     VideoAsset?
+
+  batchAssignments BatchContentAssignment[]
+  progress         StudentProgress[]
+
+  @@index([moduleId])
+  @@index([type, status])
+  @@map("contents")
+}
+
+// 1:1 extension of Content, only present when Content.type = VIDEO.
+model VideoAsset {
+  id                   String           @id @default(uuid())
+  contentId            String           @unique @map("content_id")
+  s3RawKey             String           @map("s3_raw_key")
+  hlsManifestKey       String?          @map("hls_manifest_key")
+  durationSeconds      Int?             @map("duration_seconds")
+  transcodeStatus      TranscodeStatus  @default(PENDING) @map("transcode_status")
+  transcodeJobId       String?          @map("transcode_job_id")
+  availableResolutions String[]        @map("available_resolutions")
+  sizeBytes            BigInt           @map("size_bytes")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@map("video_assets")
+}
+
+// ---------------------------------------------------------------------------
+// Batches, Enrollment, Content release, Progress
+// ---------------------------------------------------------------------------
+
+model Batch {
+  id        String      @id @default(uuid())
+  courseId  String      @map("course_id")
+  name      String
+  code      String      @unique
+  startDate DateTime    @map("start_date")
+  endDate   DateTime?   @map("end_date")
+  timezone  String      @default("Asia/Kolkata")
+  capacity  Int?
+  status    BatchStatus @default(UPCOMING)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  course             Course                    @relation(fields: [courseId], references: [id])
+  mentors            BatchMentor[]
+  enrollments        Enrollment[]
+  contentAssignments BatchContentAssignment[]
+  notifications      Notification[]
+
+  @@index([courseId])
+  @@index([status])
+  @@map("batches")
+}
+
+model BatchMentor {
+  batchId         String   @map("batch_id")
+  mentorProfileId String   @map("mentor_profile_id")
+  assignedAt      DateTime @default(now()) @map("assigned_at")
+
+  batch  Batch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  mentor MentorProfile @relation(fields: [mentorProfileId], references: [id], onDelete: Cascade)
+
+  @@id([batchId, mentorProfileId])
+  @@map("batch_mentors")
+}
+
+model Enrollment {
+  id                     String           @id @default(uuid())
+  studentProfileId       String           @map("student_profile_id")
+  batchId                String           @map("batch_id")
+  status                 EnrollmentStatus @default(ACTIVE)
+  feeStatus              FeeStatus        @default(PENDING) @map("fee_status")
+  enrolledAt             DateTime         @default(now()) @map("enrolled_at")
+  completedAt            DateTime?        @map("completed_at")
+  transferredFromBatchId String?          @map("transferred_from_batch_id")
+
+  student StudentProfile @relation(fields: [studentProfileId], references: [id])
+  batch   Batch          @relation(fields: [batchId], references: [id])
+
+  @@unique([studentProfileId, batchId])
+  @@index([batchId])
+  @@map("enrollments")
+}
+
+// Which content is currently released to which batch — decouples "content
+// exists" from "cohort can see it" so drip-release scheduling doesn't require
+// duplicating content records.
+model BatchContentAssignment {
+  id         String    @id @default(uuid())
+  batchId    String    @map("batch_id")
+  contentId  String    @map("content_id")
+  releaseAt  DateTime? @map("release_at") // null = immediately visible once assigned
+  assignedAt DateTime  @default(now()) @map("assigned_at")
+
+  batch   Batch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, contentId])
+  @@map("batch_content_assignments")
+}
+
+model StudentProgress {
+  id                  String    @id @default(uuid())
+  studentProfileId    String    @map("student_profile_id")
+  contentId           String    @map("content_id")
+  watchedSeconds      Int       @default(0) @map("watched_seconds")
+  lastPositionSeconds Int       @default(0) @map("last_position_seconds")
+  completed           Boolean   @default(false)
+  completedAt         DateTime? @map("completed_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  student StudentProfile @relation(fields: [studentProfileId], references: [id])
+  content Content        @relation(fields: [contentId], references: [id])
+
+  @@unique([studentProfileId, contentId])
+  @@map("student_progress")
+}
+
+// ---------------------------------------------------------------------------
+// Assignments
+// ---------------------------------------------------------------------------
+
+model Assignment {
+  id           String           @id @default(uuid())
+  moduleId     String           @map("module_id")
+  title        String
+  description  String?
+  dueAt        DateTime?        @map("due_at")
+  maxScore     Int              @default(100) @map("max_score")
+  allowedTypes SubmissionType[] @map("allowed_types")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  module      Module                 @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  submissions AssignmentSubmission[]
+
+  @@index([moduleId])
+  @@map("assignments")
+}
+
+model AssignmentSubmission {
+  id                    String            @id @default(uuid())
+  assignmentId          String            @map("assignment_id")
+  studentProfileId      String            @map("student_profile_id")
+  type                  SubmissionType
+  fileKey               String?           @map("file_key")
+  githubUrl             String?           @map("github_url")
+  status                SubmissionStatus  @default(SUBMITTED)
+  score                 Int?
+  feedback              String?
+  gradedByMentorId      String?           @map("graded_by_mentor_id")
+  gradedAt              DateTime?         @map("graded_at")
+  submittedAt           DateTime          @default(now()) @map("submitted_at")
+  attemptNumber         Int               @default(1) @map("attempt_number")
+
+  assignment  Assignment     @relation(fields: [assignmentId], references: [id])
+  student     StudentProfile @relation(fields: [studentProfileId], references: [id])
+  gradedBy    MentorProfile? @relation("SubmissionGrader", fields: [gradedByMentorId], references: [id])
+
+  @@index([assignmentId])
+  @@index([studentProfileId])
+  @@map("assignment_submissions")
+}
+
+// ---------------------------------------------------------------------------
+// Notifications, Testimonials
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id            String                 @id @default(uuid())
+  title         String
+  body          String
+  targetType    NotificationTargetType @map("target_type")
+  courseId      String?                @map("course_id")
+  batchId       String?                @map("batch_id")
+  createdById   String                 @map("created_by_id")
+  createdAt     DateTime               @default(now()) @map("created_at")
+
+  createdBy  User                     @relation(fields: [createdById], references: [id])
+  batch      Batch?                   @relation(fields: [batchId], references: [id])
+  recipients NotificationRecipient[]
+
+  @@index([batchId])
+  @@map("notifications")
+}
+
+model NotificationRecipient {
+  id             String    @id @default(uuid())
+  notificationId String    @map("notification_id")
+  userId         String    @map("user_id")
+  readAt         DateTime? @map("read_at")
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId, readAt])
+  @@map("notification_recipients")
+}
+
+model Testimonial {
+  id               String            @id @default(uuid())
+  studentProfileId String            @map("student_profile_id")
+  courseId         String?           @map("course_id")
+  mentorProfileId  String?           @map("mentor_profile_id")
+  rating           Int
+  content          String
+  status           TestimonialStatus @default(PENDING)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  reviewedById     String?           @map("reviewed_by_id")
+  reviewedAt       DateTime?         @map("reviewed_at")
+
+  student    StudentProfile @relation(fields: [studentProfileId], references: [id])
+  course     Course?        @relation(fields: [courseId], references: [id])
+  mentor     MentorProfile? @relation("TestimonialMentor", fields: [mentorProfileId], references: [id])
+  reviewedBy User?          @relation("TestimonialReviewer", fields: [reviewedById], references: [id])
+
+  @@map("testimonials")
+}
+
+// ---------------------------------------------------------------------------
+// Security & Audit: Login logs, Device fingerprints, Sessions, Audit log
+// ---------------------------------------------------------------------------
+
+model LoginLog {
+  id                  String    @id @default(uuid())
+  userId              String    @map("user_id")
+  deviceFingerprintId String?   @map("device_fingerprint_id")
+  ipAddress           String    @map("ip_address")
+  userAgent           String    @map("user_agent")
+  success             Boolean
+  mfaUsed             Boolean   @default(false) @map("mfa_used")
+  failureReason       String?   @map("failure_reason")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  user              User               @relation(fields: [userId], references: [id])
+  deviceFingerprint DeviceFingerprint? @relation(fields: [deviceFingerprintId], references: [id])
+
+  @@index([userId, createdAt])
+  @@map("login_logs")
+}
+
+model DeviceFingerprint {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  fingerprintHash String  @map("fingerprint_hash")
+  browser        String?
+  os             String?
+  deviceType     String?  @map("device_type")
+  trusted        Boolean  @default(false)
+  firstSeenAt    DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt     DateTime @updatedAt @map("last_seen_at")
+
+  user      User       @relation(fields: [userId], references: [id])
+  loginLogs LoginLog[]
+  sessions  Session[]
+
+  @@unique([userId, fingerprintHash])
+  @@map("device_fingerprints")
+}
+
+model Session {
+  id                  String    @id @default(uuid())
+  userId              String    @map("user_id")
+  deviceFingerprintId String?   @map("device_fingerprint_id")
+  ipAddress           String    @map("ip_address")
+  userAgent           String    @map("user_agent")
+  issuedAt            DateTime  @default(now()) @map("issued_at")
+  expiresAt           DateTime  @map("expires_at")
+  revokedAt           DateTime? @map("revoked_at")
+  revokedReason       String?   @map("revoked_reason")
+
+  user              User               @relation(fields: [userId], references: [id])
+  deviceFingerprint DeviceFingerprint? @relation(fields: [deviceFingerprintId], references: [id])
+
+  @@index([userId, revokedAt, expiresAt])
+  @@map("sessions")
+}
+
+// Append-only. No update/delete path is exposed at the application layer —
+// enforced via a Postgres REVOKE on UPDATE/DELETE for the app's DB role.
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorUserId  String?  @map("actor_user_id") // null = system/automated action
+  action       String // e.g. "student.suspend", "content.upload", "impersonation.start"
+  resourceType String   @map("resource_type")
+  resourceId   String?  @map("resource_id")
+  targetUserId String?  @map("target_user_id")
+  metadata     Json     @default("{}")
+  ipAddress    String?  @map("ip_address")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  actor  User? @relation("AuditActor", fields: [actorUserId], references: [id])
+  target User? @relation("AuditTarget", fields: [targetUserId], references: [id])
+
+  @@index([actorUserId, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("audit_logs")
+}
